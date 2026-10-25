@@ -1,0 +1,17 @@
+node_modules/
+tools/downloads/
+tools/screens/
+*.log
+
+# Local tool settings
+.claude/settings.local.json
+.DS_Store
+Thumbs.db
+
+# .NET
+dotnet/**/bin/
+dotnet/**/obj/
+dotnet/.wix/
+dotnet/installer/publish/
+dotnet/installer/artifacts/
+*.user

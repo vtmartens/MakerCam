@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <!--
+    MakerCam MSI.
+
+    Installs a self-contained single-file build to Program Files, adds a Start
+    menu shortcut, and registers "Open with MakerCam" for SVG files.
+
+    The .svg association deliberately does NOT become the system default:
+    MakerCam only adds a ProgID to OpenWithProgids, so browsers and drawing
+    programs keep opening SVG files unless the user chooses otherwise.
+  -->
+  <Package Name="MakerCam"
+           Manufacturer="MakerCam"
+           Version="$(var.Version)"
+           UpgradeCode="E2945BDE-FA10-4EE1-9E5F-7BAC8A731494"
+           Scope="perMachine"
+           Compressed="yes"
+           Language="1033">
+
+    <SummaryInformation Description="MakerCam — 2.5D CAM editor for SVG drawings"
+                        Manufacturer="MakerCam" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of MakerCam is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="MakerCamIcon" SourceFile="..\src\MakerCam.App\Assets\MakerCam.ico" />
+    <Property Id="ARPPRODUCTICON" Value="MakerCamIcon" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
+    <ui:WixUI Id="WixUI_InstallDir" />
+    <WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="MakerCam">
+
+        <Component Id="MainExecutable" Guid="*">
+          <File Id="MakerCamExe"
+                Source="publish\MakerCam.exe"
+                KeyPath="yes">
+            <Shortcut Id="StartMenuShortcut"
+                      Directory="ProgramMenuFolder"
+                      Name="MakerCam"
+                      Description="2.5D CAM editor for SVG drawings"
+                      WorkingDirectory="INSTALLFOLDER"
+                      Advertise="yes" />
+          </File>
+        </Component>
+
+        <Component Id="LicenseFile" Guid="*">
+          <File Id="LicenseTxt" Source="..\..\LICENSE" KeyPath="yes" />
+        </Component>
+
+        <Component Id="FileAssociations" Guid="*">
+          <!-- ProgID for MakerCam project / SVG files. -->
+          <RegistryKey Root="HKLM" Key="Software\Classes\MakerCam.Project">
+            <RegistryValue Type="string" Value="MakerCam Project" KeyPath="yes" />
+            <RegistryValue Name="DefaultIcon" Type="string"
+                           Value="&quot;[INSTALLFOLDER]MakerCam.exe&quot;,0" />
+            <RegistryKey Key="shell\open\command">
+              <RegistryValue Type="string"
+                             Value="&quot;[INSTALLFOLDER]MakerCam.exe&quot; &quot;%1&quot;" />
+            </RegistryKey>
+          </RegistryKey>
+
+          <!-- Offer MakerCam in Explorer's "Open with" list for SVG files. -->
+          <RegistryKey Root="HKLM" Key="Software\Classes\.svg\OpenWithProgids">
+            <RegistryValue Name="MakerCam.Project" Type="string" Value="" />
+          </RegistryKey>
+
+          <!--
+            Register the executable under Applications so Windows also lists
+            MakerCam by name in the "Open with" picker.
+          -->
+          <RegistryKey Root="HKLM" Key="Software\Classes\Applications\MakerCam.exe">
+            <RegistryValue Name="FriendlyAppName" Type="string" Value="MakerCam" />
+            <RegistryKey Key="shell\open\command">
+              <RegistryValue Type="string"
+                             Value="&quot;[INSTALLFOLDER]MakerCam.exe&quot; &quot;%1&quot;" />
+            </RegistryKey>
+            <RegistryKey Key="SupportedTypes">
+              <RegistryValue Name=".svg" Type="string" Value="" />
+            </RegistryKey>
+          </RegistryKey>
+        </Component>
+
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="MainFeature" Title="MakerCam" Level="1">
+      <ComponentRef Id="MainExecutable" />
+      <ComponentRef Id="LicenseFile" />
+      <ComponentRef Id="FileAssociations" />
+    </Feature>
+
+  </Package>
+</Wix>

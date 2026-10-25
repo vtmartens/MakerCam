@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MakerCam Modern</title>
+    <meta
+      name="description"
+      content="A modern browser port of PartKam / MakerCam: import SVG, create CAM toolpaths and export G-code."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230a84ff'/%3E%3Cpath d='M12 4 4 8.5v7L12 20l8-4.5v-7L12 4Z' fill='none' stroke='white' stroke-width='1.4'/%3E%3Cpath d='M12 8v8M8.5 10v4M15.5 10v4' stroke='white' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22">
+            <path d="M12 2 3 7v10l9 5 9-5V7l-9-5Z" fill="none" stroke="currentColor" stroke-width="1.6" />
+            <path d="M12 7v10M7.5 9.5v5M16.5 9.5v5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+        </span>
+        <span class="brand-name">MakerCam</span>
+        <span class="brand-tag">modern</span>
+      </div>
+
+      <nav class="menus" aria-label="Main menu">
+        <div class="menu">
+          <button type="button" class="menu-button" data-menu="file">File</button>
+          <div class="dropdown" data-dropdown="file">
+            <button data-command="file-import">Import SVG…<span class="shortcut">Ctrl+O</span></button>
+            <button data-command="file-open-project">Open project…</button>
+            <div class="separator"></div>
+            <button data-command="file-save">Save project (SVG)<span class="shortcut">Ctrl+S</span></button>
+            <button data-command="file-export">Export G-code…<span class="shortcut">Ctrl+E</span></button>
+            <div class="separator"></div>
+            <button data-command="file-new">New project</button>
+          </div>
+        </div>
+
+        <div class="menu">
+          <button type="button" class="menu-button" data-menu="edit">Edit</button>
+          <div class="dropdown" data-dropdown="edit">
+            <button data-command="edit-undo">Undo<span class="shortcut">Ctrl+Z</span></button>
+            <button data-command="edit-redo">Redo<span class="shortcut">Ctrl+Y</span></button>
+            <div class="separator"></div>
+            <button data-command="edit-selectall">Select all<span class="shortcut">Ctrl+A</span></button>
+            <button data-command="edit-copy">Copy<span class="shortcut">Ctrl+C</span></button>
+            <button data-command="edit-paste">Paste<span class="shortcut">Ctrl+V</span></button>
+            <button data-command="edit-delete">Delete<span class="shortcut">Del</span></button>
+            <div class="separator"></div>
+            <button data-command="edit-scale">Scale…</button>
+            <button data-command="edit-rotate">Rotate…</button>
+            <button data-command="edit-skew">Skew…</button>
+            <div class="separator"></div>
+            <button data-command="edit-preferences">Preferences…</button>
+          </div>
+        </div>
+
+        <div class="menu">
+          <button type="button" class="menu-button" data-menu="insert">Insert</button>
+          <div class="dropdown" data-dropdown="insert">
+            <button data-command="insert-circle">Circle…</button>
+            <button data-command="insert-ellipse">Ellipse…</button>
+            <button data-command="insert-rectangle">Rectangle…</button>
+            <button data-command="insert-roundedrect">Rounded rectangle…</button>
+            <button data-command="insert-polygon">Polygon…</button>
+            <button data-command="insert-star">Star…</button>
+          </div>
+        </div>
+
+        <div class="menu">
+          <button type="button" class="menu-button" data-menu="cam">CAM</button>
+          <div class="dropdown" data-dropdown="cam">
+            <button data-command="cam-profile">Profile…</button>
+            <button data-command="cam-pocket">Pocket…</button>
+            <button data-command="cam-follow">Follow path…</button>
+            <button data-command="cam-drill">Drill…</button>
+            <button data-command="cam-drillpath">Holes along path…</button>
+            <div class="separator"></div>
+            <button data-command="cam-tabs">Add tabs…</button>
+            <button data-command="cam-regenerate">Regenerate all toolpaths</button>
+            <button data-command="cam-delete">Delete selected operation</button>
+          </div>
+        </div>
+
+        <div class="menu">
+          <button type="button" class="menu-button" data-menu="toolpaths">Toolpaths</button>
+          <div class="dropdown" data-dropdown="toolpaths">
+            <button data-command="toolpaths-export">Export G-code…</button>
+            <button data-command="toolpaths-toggle">Show / hide toolpaths</button>
+            <button data-command="toolpaths-diameter">Show tool diameter</button>
+            <div class="separator"></div>
+            <button data-command="toolpaths-refit">Fit view to drawing</button>
+          </div>
+        </div>
+
+        <div class="menu">
+          <button type="button" class="menu-button" data-menu="nesting">Nesting</button>
+          <div class="dropdown" data-dropdown="nesting">
+            <button data-command="nest-boundary">Set material boundary</button>
+            <button data-command="nest-run">Nest toolpaths…</button>
+          </div>
+        </div>
+
+        <div class="menu">
+          <button type="button" class="menu-button" data-menu="help">Help</button>
+          <div class="dropdown" data-dropdown="help">
+            <button data-command="help-example">Load example project</button>
+            <button data-command="help-guide">Quick guide</button>
+            <button data-command="help-about">About</button>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <div class="toolbar" role="toolbar" aria-label="Tools and view controls">
+      <div class="tool-group" role="group" aria-label="Tools">
+        <button type="button" class="tool-button active" data-tool="select" title="Select and move (V)">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path d="m5 3 6.5 16 2.2-6.2L20 10.6 5 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          <span>Select</span>
+        </button>
+        <button type="button" class="tool-button" data-tool="pan" title="Pan (H or hold Space)">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path d="M8 11V6.5a1.5 1.5 0 0 1 3 0V11m0-4.5a1.5 1.5 0 0 1 3 0V11m0-3a1.5 1.5 0 0 1 3 0v6.5c0 3.6-2.4 6-6 6-2.5 0-4.4-1.2-5.5-3.4L3.6 13a1.6 1.6 0 0 1 2.8-1.5L8 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Pan</span>
+        </button>
+        <button type="button" class="tool-button" data-tool="pen" title="Draw polyline (P)">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path d="m4 20 4-1 10-10a2.1 2.1 0 0 0-3-3L5 16l-1 4Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+          <span>Pen</span>
+        </button>
+      </div>
+
+      <div class="toolbar-sep" aria-hidden="true"></div>
+
+      <div class="tool-group">
+        <button type="button" class="icon-button" id="btn-fit" title="Fit view (F)">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <button type="button" class="icon-button" id="btn-zoom-out" title="Zoom out">−</button>
+        <button type="button" class="icon-button" id="btn-zoom-in" title="Zoom in">+</button>
+      </div>
+
+      <div class="toolbar-sep" aria-hidden="true"></div>
+
+      <div class="tool-group">
+        <button type="button" class="toggle-button active" id="btn-grid" aria-pressed="true" title="Toggle grid (G)">Grid</button>
+        <button type="button" class="toggle-button" id="btn-snap" aria-pressed="false" title="Snap to grid">Snap</button>
+        <button type="button" class="toggle-button active" id="btn-show-toolpaths" aria-pressed="true" title="Show or hide generated toolpaths">Paths</button>
+        <button type="button" class="toggle-button" id="btn-show-diameter" aria-pressed="false" title="Show cutter diameter">Cutter</button>
+      </div>
+
+      <div class="toolbar-spacer"></div>
+
+      <button type="button" class="tool-button sidebar-toggle" id="btn-sidebar" title="Show the toolpaths panel">
+        Panel
+      </button>
+
+      <label class="unit-control" title="Display and output units">
+        <span>Units</span>
+        <select id="unit-select">
+          <option value="mm">mm</option>
+          <option value="in">in</option>
+        </select>
+      </label>
+    </div>
+
+    <main class="workspace">
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="canvas" aria-label="Drawing canvas"></canvas>
+        <div class="empty-state" id="empty-state">
+          <div class="empty-card">
+            <h2>Start a project</h2>
+            <p>Import an SVG drawing or insert a shape, then select paths and add a CAM operation.</p>
+            <div class="empty-actions">
+              <button type="button" class="button primary" id="btn-empty-import">Import SVG</button>
+              <button type="button" class="button" id="btn-empty-shape">Insert shape</button>
+              <button type="button" class="button" id="btn-empty-example">Load example</button>
+            </div>
+            <p class="empty-note">Tip: drag to select, wheel to zoom, hold Space to pan.</p>
+          </div>
+        </div>
+        <div id="toasts" class="toasts" aria-live="polite"></div>
+      </div>
+
+      <aside class="sidebar" aria-label="Toolpaths panel">
+        <div class="sidebar-header">
+          <div>
+            <h2>Toolpaths</h2>
+            <p class="sidebar-sub" id="op-count">No operations yet</p>
+          </div>
+          <button type="button" class="button small" id="btn-add-op">+ Add</button>
+        </div>
+        <div class="op-list" id="op-list">
+          <div class="op-empty" id="op-empty">
+            <p>No CAM operations yet.</p>
+            <p class="muted">Select one or more closed paths and choose <strong>CAM → Profile</strong>, <strong>Pocket</strong> or <strong>Drill</strong>.</p>
+          </div>
+        </div>
+        <div class="sidebar-footer">
+          <button type="button" class="button primary wide" id="btn-export">Export G-code</button>
+          <p class="hint" id="sidebar-hint">Tip: click a path to select it. Shift-click adds to the selection.</p>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="statusbar">
+      <span id="status-coords">X 0.00 Y 0.00 mm</span>
+      <span class="status-sep"></span>
+      <span id="status-zoom">100%</span>
+      <span class="status-sep"></span>
+      <span id="status-selection">0 paths selected</span>
+      <span class="status-spacer"></span>
+      <span id="status-hint">Ready</span>
+    </footer>
+
+    <input type="file" id="file-input" accept=".svg,image/svg+xml" hidden />
+    <script src="./app.js"></script>
+  </body>
+</html>

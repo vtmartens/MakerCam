@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MakerCam.App/MakerCam.App.csproj" />
+    <Project Path="src/MakerCam.Core/MakerCam.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MakerCam.Core.Tests/MakerCam.Core.Tests.csproj" />
+  </Folder>
+</Solution>
