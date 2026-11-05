@@ -1,4 +1,5 @@
 using ClipperLib;
+using System.Globalization;
 
 namespace MakerCam.Core;
 
@@ -485,6 +486,32 @@ public static class CamEngine
     /* Toolpath generation                                             */
     /* -------------------------------------------------------------- */
 
+    /// <summary>
+    /// Names selected paths that profile/pocket/drill will skip because they are
+    /// open. These operations silently ignored open paths before, which made a
+    /// nearly-closed SVG path very hard to find.
+    /// </summary>
+    public static List<string> OpenPathWarnings(IReadOnlyList<Path> paths, int limit = 3)
+    {
+        var open = paths
+            .Where(p => p.Segments.Count > 0 && !Geom.IsClosedPath(p))
+            .ToList();
+        var messages = new List<string>();
+        if (open.Count == 0) return messages;
+
+        foreach (var path in open.Take(limit))
+        {
+            var gap = Geom.Dist(path.Segments[0].P1, path.Segments[^1].P2);
+            var name = !string.IsNullOrWhiteSpace(path.Name) ? path.Name! : path.Id ?? "unnamed path";
+            var gapText = gap < 1e-3
+                ? "gap < 0.001 mm"
+                : $"gap {gap.ToString("0.###", CultureInfo.InvariantCulture)} mm";
+            messages.Add($"Open path \"{name}\" ({gapText}) was skipped.");
+        }
+        if (open.Count > limit) messages.Add($"And {open.Count - limit} more open path(s).");
+        return messages;
+    }
+
     public static GeneratedToolpath GenerateToolpath(
         OperationType type,
         OperationParams opParams,
@@ -494,6 +521,7 @@ public static class CamEngine
         var warnings = new List<string>();
         var radius = opParams.ToolDiameter / 2;
         var selected = paths.ToList();
+        var openWarnings = OpenPathWarnings(selected);
 
         switch (type)
         {
@@ -502,11 +530,12 @@ public static class CamEngine
                 var input = PathsToLoops(selected, tolerance);
                 if (input.Count == 0)
                 {
-                    return new GeneratedToolpath
-                    {
-                        Warnings = { "Select at least one closed path." },
-                    };
+                    var empty = new GeneratedToolpath();
+                    empty.Warnings.AddRange(openWarnings);
+                    empty.Warnings.Add("Select at least one closed path.");
+                    return empty;
                 }
+                warnings.AddRange(openWarnings);
 
                 var result = OffsetRegion(input, opParams.Outside ? radius : -radius);
                 if (result.Count == 0)
@@ -534,11 +563,12 @@ public static class CamEngine
                 var input = PathsToLoops(selected, tolerance);
                 if (input.Count == 0)
                 {
-                    return new GeneratedToolpath
-                    {
-                        Warnings = { "Select at least one closed path." },
-                    };
+                    var empty = new GeneratedToolpath();
+                    empty.Warnings.AddRange(openWarnings);
+                    empty.Warnings.Add("Select at least one closed path.");
+                    return empty;
                 }
+                warnings.AddRange(openWarnings);
 
                 var stepoverDist = Math.Max(0.01, opParams.Stepover * opParams.ToolDiameter);
                 var current = OffsetRegion(input, -(radius + opParams.RoughingClearance));
@@ -627,11 +657,12 @@ public static class CamEngine
                 var loops = PathsToLoops(selected, tolerance);
                 if (loops.Count == 0)
                 {
-                    return new GeneratedToolpath
-                    {
-                        Warnings = { "Select at least one closed path." },
-                    };
+                    var empty = new GeneratedToolpath();
+                    empty.Warnings.AddRange(openWarnings);
+                    empty.Warnings.Add("Select at least one closed path.");
+                    return empty;
                 }
+                warnings.AddRange(openWarnings);
 
                 var points = new List<Vec>();
                 if (opParams.Center || opParams.Spacing == 0)

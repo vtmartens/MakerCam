@@ -138,6 +138,43 @@ public class CamTests
     }
 
     [Fact]
+    public void NamesASkippedOpenPathAndReportsItsGap()
+    {
+        var open = new Path
+        {
+            Id = "gap-path",
+            Name = "Outer plate",
+            Closed = false,
+            Segments = { new LineSegment(new Vec(0, 0), new Vec(10, 0)) },
+        };
+        var result = CamEngine.GenerateToolpath(OperationType.Profile, Params(), new[] { open }, 0.02);
+
+        Assert.Empty(result.Loops);
+        Assert.Contains("Outer plate", result.Warnings[0]);
+        Assert.Contains("10 mm", result.Warnings[0]);
+        Assert.Contains(result.Warnings, w => w.Contains("closed path", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void WarnsAboutOpenPathsEvenWhenClosedPathsAreUsable()
+    {
+        var open = new Path
+        {
+            Id = "gap-path",
+            Closed = false,
+            Segments = { new LineSegment(new Vec(0, 0), new Vec(10, 0)) },
+        };
+        var result = CamEngine.GenerateToolpath(
+            OperationType.Profile,
+            Params(p => { p.Outside = true; p.ToolDiameter = 6; }),
+            new[] { Square(50), open },
+            0.01);
+
+        Assert.NotEmpty(result.Loops);
+        Assert.Contains(result.Warnings, w => w.Contains("gap-path"));
+    }
+
+    [Fact]
     public void FindsDrillCentres()
     {
         var result = CamEngine.GenerateToolpath(

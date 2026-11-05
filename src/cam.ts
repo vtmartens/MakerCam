@@ -464,6 +464,26 @@ export interface GeneratedToolpath {
   warnings: string[];
 }
 
+/**
+ * Names selected paths that profile/pocket/drill will skip because they are
+ * open. These operations silently ignored open paths before, which made a
+ * nearly-closed SVG path very hard to find.
+ */
+export function openPathWarnings(paths: Path[], limit = 3): string[] {
+  const open = paths.filter((p) => p.segments.length > 0 && !isClosedPath(p));
+  if (open.length === 0) return [];
+  const messages = open.slice(0, limit).map((path) => {
+    const gap = dist(path.segments[0].p1, path.segments[path.segments.length - 1].p2);
+    const name = path.name || path.id || 'unnamed path';
+    const gapText = gap < 1e-3 ? 'gap < 0.001 mm' : `gap ${Math.round(gap * 1000) / 1000} mm`;
+    return `Open path "${name}" (${gapText}) was skipped.`;
+  });
+  if (open.length > limit) {
+    messages.push(`And ${open.length - limit} more open path(s).`);
+  }
+  return messages;
+}
+
 export function generateToolpath(
   type: OperationType,
   params: OperationParams,
@@ -473,12 +493,18 @@ export function generateToolpath(
   const warnings: string[] = [];
   const radius = params.toolDiameter / 2;
   const selected = paths;
+  const openWarnings = openPathWarnings(selected);
 
   if (type === 'profile') {
     const input = pathsToLoops(selected, tolerance);
     if (input.length === 0) {
-      return { loops: [], drillPoints: [], warnings: ['Select at least one closed path.'] };
+      return {
+        loops: [],
+        drillPoints: [],
+        warnings: [...openWarnings, 'Select at least one closed path.'],
+      };
     }
+    warnings.push(...openWarnings);
     let result = offsetRegion(input, params.outside ? radius : -radius);
     if (result.length === 0) {
       warnings.push(
@@ -497,8 +523,13 @@ export function generateToolpath(
   if (type === 'pocket') {
     const input = pathsToLoops(selected, tolerance);
     if (input.length === 0) {
-      return { loops: [], drillPoints: [], warnings: ['Select at least one closed path.'] };
+      return {
+        loops: [],
+        drillPoints: [],
+        warnings: [...openWarnings, 'Select at least one closed path.'],
+      };
     }
+    warnings.push(...openWarnings);
     const stepoverDist = Math.max(0.01, params.stepover * params.toolDiameter);
     let current = offsetRegion(input, -(radius + params.roughingClearance));
     if (current.length === 0) {
@@ -545,8 +576,13 @@ export function generateToolpath(
   // drill
   const loops = pathsToLoops(selected, tolerance);
   if (loops.length === 0) {
-    return { loops: [], drillPoints: [], warnings: ['Select at least one closed path.'] };
+    return {
+      loops: [],
+      drillPoints: [],
+      warnings: [...openWarnings, 'Select at least one closed path.'],
+    };
   }
+  warnings.push(...openWarnings);
   const points: Vec[] = [];
   if (params.center || params.spacing === 0) {
     for (const loop of loops) {

@@ -12,12 +12,14 @@ import {
   Path,
   Vec,
   clonePath,
+  closePathGap,
   closedPolygon,
   dist,
   distanceToPolyline,
   ellipsePath,
   flattenPath,
   isClosedPath,
+  joinOpenPaths,
   matrixMultiply,
   matrixRotate,
   matrixScale,
@@ -1306,8 +1308,14 @@ class App {
     this.updateEmptyState();
     if (!op.processed) {
       showToast(warnings[0] || 'No toolpath could be generated. Try different parameters.', 'error', 6000);
+    } else if (warnings.length > 0) {
+      showToast(
+        `${TYPE_LABEL[type]} created with warnings: ${warnings.slice(0, 2).join(' ')}`,
+        'warning',
+        6000,
+      );
     } else {
-      showToast(`${TYPE_LABEL[type]} created${warnings.length ? ' with warnings' : ''}`, warnings.length ? 'warning' : 'success', 3200);
+      showToast(`${TYPE_LABEL[type]} created`, 'success', 3200);
     }
     this.requestRender();
   }
@@ -1994,6 +2002,110 @@ class App {
     });
   }
 
+  private repairOpenPathsDialog(): void {
+    const selection = this.selectedPaths();
+    const scope = selection.length > 0 ? selection : this.paths;
+    const open = scope.filter((p) => p.segments.length > 0 && !isClosedPath(p));
+    if (open.length === 0) {
+      showToast(
+        selection.length > 0
+          ? 'The selected paths are already closed.'
+          : 'There are no open paths to repair.',
+        'info',
+        2400,
+      );
+      return;
+    }
+
+    const u = this.unitLabel();
+    void openDialog({
+      title: 'Repair open paths',
+      description:
+        `${open.length} open path${open.length === 1 ? '' : 's'} ` +
+        `${selection.length > 0 ? 'in the selection' : 'in the drawing'}. ` +
+        'Close adds a line across each path’s own gap; join merges free ends of different paths that meet.',
+      fields: [
+        {
+          key: 'tolerance',
+          label: 'Max gap',
+          type: 'number',
+          value: Number(this.toDisplay(0.2).toFixed(4)),
+          min: 0,
+          step: 0.05,
+          suffix: u,
+        },
+        { key: 'close', label: 'Close each path’s own gap', type: 'checkbox', value: true },
+        { key: 'join', label: 'Join ends between paths', type: 'checkbox', value: true },
+      ],
+      submitLabel: 'Repair',
+      validate: (v) => {
+        const t = Number(v.tolerance);
+        if (!Number.isFinite(t) || t < 0) return 'Max gap must be zero or more.';
+        if (!v.close && !v.join) return 'Choose at least one repair action.';
+        return null;
+      },
+    }).then((v) => {
+      if (!v) return;
+      this.repairOpenPaths(open, this.fromDisplay(Number(v.tolerance)), !!v.close, !!v.join);
+    });
+  }
+
+  private repairOpenPaths(
+    targets: Path[],
+    tolerance: number,
+    closeGaps: boolean,
+    joinEnds: boolean,
+  ): void {
+    this.pushUndo();
+    let closedCount = 0;
+    let joinCount = 0;
+
+    if (closeGaps) {
+      for (const path of targets) {
+        if (closePathGap(path, tolerance)) closedCount++;
+      }
+    }
+
+    if (joinEnds) {
+      const result = joinOpenPaths(targets, tolerance);
+      joinCount = result.joins;
+      if (result.absorbed.size > 0) {
+        const absorbed = new Set(result.absorbed.keys());
+        for (const [absorbedPath, owner] of result.absorbed) {
+          if (absorbedPath.id && this.selection.has(absorbedPath.id)) {
+            this.selection.delete(absorbedPath.id);
+            if (owner.id) this.selection.add(owner.id);
+          }
+          if (!absorbedPath.id || !owner.id || absorbedPath.id === owner.id) continue;
+          if (this.nestBoundaryId === absorbedPath.id) this.nestBoundaryId = owner.id;
+          // Operations that referenced the absorbed path now use its owner.
+          for (const op of this.operations) {
+            if (!op.pathIds.includes(absorbedPath.id)) continue;
+            op.pathIds = [
+              ...new Set(op.pathIds.map((id) => (id === absorbedPath.id ? owner.id! : id))),
+            ];
+          }
+        }
+        this.paths = this.paths.filter((p) => !absorbed.has(p));
+        const survivingIds = new Set(this.paths.map((p) => p.id));
+        this.selection = new Set([...this.selection].filter((id) => survivingIds.has(id)));
+      }
+    }
+
+    this.regenerateAll(true);
+    this.updateSelectionUI();
+    this.requestRender();
+
+    if (closedCount === 0 && joinCount === 0) {
+      showToast('No open ends were within the maximum gap.', 'warning', 4000);
+      return;
+    }
+    const parts: string[] = [];
+    if (closedCount > 0) parts.push(`${closedCount} gap${closedCount === 1 ? '' : 's'} closed`);
+    if (joinCount > 0) parts.push(`${joinCount} join${joinCount === 1 ? '' : 's'} made`);
+    showToast(`Repaired open paths: ${parts.join(', ')}.`, 'success', 3200);
+  }
+
   /* ------------------------------------------------------------------ */
   /* File operations                                                     */
   /* ------------------------------------------------------------------ */
@@ -2575,6 +2687,9 @@ class App {
         break;
       case 'edit-skew':
         this.skewDialog();
+        break;
+      case 'edit-repair-open':
+        this.repairOpenPathsDialog();
         break;
       case 'edit-preferences':
         this.preferencesDialog();

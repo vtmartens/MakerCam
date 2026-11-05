@@ -258,6 +258,101 @@ public static class Geom
         return Equals(path.Segments[0].P1, path.Segments[^1].P2, tol);
     }
 
+    /// <summary>
+    /// Closes a path's own gap by appending a straight segment from its end back
+    /// to its start. Nothing changes when the gap is larger than
+    /// <paramref name="tolerance"/>. Returns true when the path was modified.
+    /// </summary>
+    public static bool ClosePathGap(Path path, double tolerance)
+    {
+        if (path.Segments.Count == 0 || IsClosedPath(path)) return false;
+        var start = path.Segments[0].P1;
+        var end = path.Segments[^1].P2;
+        if (Dist(start, end) > tolerance) return false;
+        if (!Equals(start, end, 1e-9))
+        {
+            path.Segments.Add(new LineSegment(end, start));
+        }
+        path.Closed = true;
+        return true;
+    }
+
+    /// <summary>
+    /// Merges free ends of open paths that meet within <paramref name="tolerance"/>,
+    /// repeating until no more ends qualify. A straight segment is inserted when
+    /// the ends are close but not exactly coincident.
+    /// </summary>
+    public static JoinOpenPathsResult JoinOpenPaths(IReadOnlyList<Path> input, double tolerance)
+    {
+        var paths = input.ToList();
+        var absorbed = new Dictionary<Path, Path>();
+        var joins = 0;
+
+        while (true)
+        {
+            var bestI = -1;
+            var bestJ = -1;
+            var bestAStart = false;
+            var bestBStart = false;
+            var bestDistance = double.PositiveInfinity;
+
+            void Consider(int i, int j, bool joinAtAStart, bool joinAtBStart, double distance)
+            {
+                if (distance > tolerance || distance >= bestDistance) return;
+                bestI = i;
+                bestJ = j;
+                bestAStart = joinAtAStart;
+                bestBStart = joinAtBStart;
+                bestDistance = distance;
+            }
+
+            for (var i = 0; i < paths.Count; i++)
+            {
+                var a = paths[i];
+                if (a.Segments.Count == 0 || IsClosedPath(a)) continue;
+                var aStartPoint = a.Segments[0].P1;
+                var aEndPoint = a.Segments[^1].P2;
+                for (var j = i + 1; j < paths.Count; j++)
+                {
+                    var b = paths[j];
+                    if (b.Segments.Count == 0 || IsClosedPath(b)) continue;
+                    var bStartPoint = b.Segments[0].P1;
+                    var bEndPoint = b.Segments[^1].P2;
+                    Consider(i, j, false, true, Dist(aEndPoint, bStartPoint));
+                    Consider(i, j, false, false, Dist(aEndPoint, bEndPoint));
+                    Consider(i, j, true, true, Dist(aStartPoint, bStartPoint));
+                    Consider(i, j, true, false, Dist(aStartPoint, bEndPoint));
+                }
+            }
+            if (bestI < 0) break;
+
+            var absorbedPath = paths[bestJ];
+            var pathA = paths[bestI];
+            var pathB = absorbedPath;
+            if (bestAStart) pathA = ReversePath(pathA);
+            if (!bestBStart) pathB = ReversePath(pathB);
+
+            var jointA = pathA.Segments[^1].P2;
+            var jointB = pathB.Segments[0].P1;
+            var segments = pathA.Segments.Select(CloneSegment).ToList();
+            if (!Equals(jointA, jointB, 1e-9))
+            {
+                segments.Add(new LineSegment(jointA, jointB));
+            }
+            segments.AddRange(pathB.Segments.Select(CloneSegment));
+
+            var survivor = paths[bestI];
+            survivor.Segments.Clear();
+            survivor.Segments.AddRange(segments);
+            survivor.Closed = false;
+            paths.RemoveAt(bestJ);
+            absorbed[absorbedPath] = survivor;
+            joins++;
+        }
+
+        return new JoinOpenPathsResult { Paths = paths, Joins = joins, Absorbed = absorbed };
+    }
+
     /* -------------------------------------------------------------- */
     /* Polygon helpers                                                 */
     /* -------------------------------------------------------------- */

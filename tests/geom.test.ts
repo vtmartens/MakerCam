@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   Matrix,
   clonePath,
+  closePathGap,
   ellipsePath,
   flattenPath,
   isClosedPath,
+  joinOpenPaths,
   matrixMultiply,
   matrixRotate,
   matrixScale,
@@ -113,5 +115,82 @@ describe('matrices', () => {
     expect(b.minX).toBeCloseTo(0, 6);
     expect(b.maxY).toBeCloseTo(10, 6);
     expect(b.minY).toBeCloseTo(0, 6);
+  });
+});
+
+describe('open path repair', () => {
+  const line = (x1: number, y1: number, x2: number, y2: number) => ({
+    kind: 'line' as const,
+    p1: { x: x1, y: y1 },
+    p2: { x: x2, y: y2 },
+  });
+
+  const nearClosed = () => ({
+    id: 'gap',
+    closed: false,
+    segments: [line(0, 0, 10, 0), line(10, 0, 10, 10), line(10, 10, 0, 0.05)],
+  });
+
+  it('closes a path gap within the tolerance', () => {
+    const path = nearClosed();
+    expect(closePathGap(path, 0.1)).toBe(true);
+    expect(path.closed).toBe(true);
+    expect(path.segments).toHaveLength(4);
+    expect(path.segments[3].p2).toEqual({ x: 0, y: 0 });
+  });
+
+  it('leaves a larger gap untouched', () => {
+    const path = nearClosed();
+    expect(closePathGap(path, 0.01)).toBe(false);
+    expect(path.closed).toBe(false);
+    expect(path.segments).toHaveLength(3);
+  });
+
+  it('joins two paths whose ends meet', () => {
+    const a = { id: 'a', closed: false, segments: [line(0, 0, 10, 0)] };
+    const b = { id: 'b', closed: false, segments: [line(10, 0, 20, 0)] };
+    const result = joinOpenPaths([a, b], 0.001);
+
+    expect(result.joins).toBe(1);
+    expect(result.paths).toEqual([a]);
+    expect(result.absorbed.get(b)).toBe(a);
+    expect(a.segments).toHaveLength(2);
+    expect(flattenPath(a)).toEqual([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 20, y: 0 },
+    ]);
+  });
+
+  it('reverses paths when their opposite ends meet', () => {
+    const a = { id: 'a', closed: false, segments: [line(0, 0, 10, 0)] };
+    const b = { id: 'b', closed: false, segments: [line(20, 0, 10, 0)] };
+    const result = joinOpenPaths([a, b], 0.001);
+
+    expect(result.joins).toBe(1);
+    expect(flattenPath(a).map((p) => p.x)).toEqual([0, 10, 20]);
+  });
+
+  it('bridges a small gap between ends', () => {
+    const a = { id: 'a', closed: false, segments: [line(0, 0, 10, 0)] };
+    const b = { id: 'b', closed: false, segments: [line(10.2, 0, 20, 0)] };
+    const result = joinOpenPaths([a, b], 0.5);
+
+    expect(result.joins).toBe(1);
+    expect(a.segments).toHaveLength(3);
+    expect(a.segments[1]).toEqual({
+      kind: 'line',
+      p1: { x: 10, y: 0 },
+      p2: { x: 10.2, y: 0 },
+    });
+  });
+
+  it('does not join ends beyond the tolerance', () => {
+    const a = { id: 'a', closed: false, segments: [line(0, 0, 10, 0)] };
+    const b = { id: 'b', closed: false, segments: [line(11, 0, 20, 0)] };
+    const result = joinOpenPaths([a, b], 0.5);
+
+    expect(result.joins).toBe(0);
+    expect(result.paths).toHaveLength(2);
   });
 });

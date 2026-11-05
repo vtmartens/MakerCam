@@ -11,6 +11,7 @@ import {
   Vec,
   dist,
   flattenPath,
+  isClosedPath,
   polygonBounds,
 } from './geom';
 import { Loop, Operation, OperationType, Unit } from './cam';
@@ -72,6 +73,8 @@ const COLORS = {
   pathHover: '#1d6fb8',
   pathSelected: '#0a84ff',
   pathReferenced: '#8a97a6',
+  /** Free ends of open paths; also used for the dashed gap link. */
+  pathOpen: '#e03131',
   profile: '#12824c',
   pocket: '#c77c08',
   follow: '#7c3aed',
@@ -136,6 +139,46 @@ function drawPath(ctx: CanvasRenderingContext2D, path: Path, view: View): void {
     }
   }
   if (path.closed) ctx.closePath();
+}
+
+/**
+ * Marks the free ends of a path that is not closed.
+ *
+ * Open paths draw exactly like closed ones and CAM operations skip them, so a
+ * stray gap (often a fraction of a millimetre after SVG import) was previously
+ * impossible to locate. Squares mark the two ends; a dashed link is added when
+ * they are within 1 mm of each other, where both markers would overlap.
+ */
+function drawOpenEnds(ctx: CanvasRenderingContext2D, path: Path, view: View): void {
+  const count = path.segments.length;
+  if (count === 0) return;
+  const start = path.segments[0].p1;
+  const end = path.segments[count - 1].p2;
+  const a = mapPoint(view, start);
+  const b = mapPoint(view, end);
+  const gapMm = dist(start, end);
+
+  ctx.save();
+  if (gapMm > 1e-9 && gapMm <= 1) {
+    ctx.setLineDash([3, 3]);
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = COLORS.pathOpen;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = COLORS.pathOpen;
+  ctx.fillStyle = COLORS.bg;
+  for (const p of [a, b]) {
+    ctx.beginPath();
+    ctx.rect(p.x - 3, p.y - 3, 6, 6);
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 function drawGrid(ctx: CanvasRenderingContext2D, view: View, width: number, height: number, unit: Unit): void {
@@ -380,6 +423,9 @@ export function render(canvas: HTMLCanvasElement, opts: RenderOptions): void {
         ctx.fill();
       }
     }
+
+    // Flag free ends so unclosed paths (which CAM skips) can be found.
+    if (!isClosedPath(path)) drawOpenEnds(ctx, path, opts.view);
   }
 
   // Toolpaths

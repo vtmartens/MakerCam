@@ -4665,6 +4665,7 @@
           "loops": [],
           "drillPoints": [],
           "warnings": [
+            "Open path \"l\" (gap 100 mm) was skipped.",
             "Select at least one closed path."
           ]
         }

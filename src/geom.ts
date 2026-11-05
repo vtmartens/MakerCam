@@ -349,6 +349,100 @@ export function isClosedPath(path: Path, tol = 1e-5): boolean {
   return equals(path.segments[0].p1, path.segments[path.segments.length - 1].p2, tol);
 }
 
+/**
+ * Closes a path's own gap by appending a straight segment from its end back to
+ * its start. Nothing changes when the gap is larger than `tolerance`.
+ * Returns true when the path was modified.
+ */
+export function closePathGap(path: Path, tolerance: number): boolean {
+  if (path.segments.length === 0 || isClosedPath(path)) return false;
+  const start = path.segments[0].p1;
+  const end = path.segments[path.segments.length - 1].p2;
+  if (dist(start, end) > tolerance) return false;
+  if (!equals(start, end, 1e-9)) {
+    path.segments.push({ kind: 'line', p1: cloneVec(end), p2: cloneVec(start) });
+  }
+  path.closed = true;
+  return true;
+}
+
+export interface JoinOpenPathsResult {
+  /** Paths that remain after joining. Merged paths keep their own identity. */
+  paths: Path[];
+  /** Number of endpoint joins performed. */
+  joins: number;
+  /** Each path absorbed into another path, mapped to its new owner. */
+  absorbed: Map<Path, Path>;
+}
+
+/**
+ * Merges free ends of open paths that meet within `tolerance`, repeating until
+ * no more ends qualify. A straight segment is inserted when the ends are close
+ * but not exactly coincident.
+ */
+export function joinOpenPaths(input: Path[], tolerance: number): JoinOpenPathsResult {
+  const paths = input.slice();
+  const absorbed = new Map<Path, Path>();
+  let joins = 0;
+
+  for (;;) {
+    let best: {
+      i: number;
+      j: number;
+      aStart: boolean;
+      bStart: boolean;
+      distance: number;
+    } | null = null;
+
+    for (let i = 0; i < paths.length; i++) {
+      const a = paths[i];
+      if (a.segments.length === 0 || isClosedPath(a)) continue;
+      const aStartPoint = a.segments[0].p1;
+      const aEndPoint = a.segments[a.segments.length - 1].p2;
+      for (let j = i + 1; j < paths.length; j++) {
+        const b = paths[j];
+        if (b.segments.length === 0 || isClosedPath(b)) continue;
+        const bStartPoint = b.segments[0].p1;
+        const bEndPoint = b.segments[b.segments.length - 1].p2;
+        const candidates = [
+          { aStart: false, bStart: true, distance: dist(aEndPoint, bStartPoint) },
+          { aStart: false, bStart: false, distance: dist(aEndPoint, bEndPoint) },
+          { aStart: true, bStart: true, distance: dist(aStartPoint, bStartPoint) },
+          { aStart: true, bStart: false, distance: dist(aStartPoint, bEndPoint) },
+        ];
+        for (const candidate of candidates) {
+          if (candidate.distance > tolerance) continue;
+          if (!best || candidate.distance < best.distance) best = { i, j, ...candidate };
+        }
+      }
+    }
+    if (!best) break;
+
+    const absorbedPath = paths[best.j];
+    let a = paths[best.i];
+    let b = absorbedPath;
+    if (best.aStart) a = reversePath(a);
+    if (!best.bStart) b = reversePath(b);
+
+    const jointA = a.segments[a.segments.length - 1].p2;
+    const jointB = b.segments[0].p1;
+    const segments = a.segments.map(cloneSegment);
+    if (!equals(jointA, jointB, 1e-9)) {
+      segments.push({ kind: 'line', p1: cloneVec(jointA), p2: cloneVec(jointB) });
+    }
+    segments.push(...b.segments.map(cloneSegment));
+
+    const survivor = paths[best.i];
+    survivor.segments = segments;
+    survivor.closed = false;
+    paths.splice(best.j, 1);
+    absorbed.set(absorbedPath, survivor);
+    joins++;
+  }
+
+  return { paths, joins, absorbed };
+}
+
 /* ------------------------------------------------------------------ */
 /* Polygon helpers                                                     */
 /* ------------------------------------------------------------------ */

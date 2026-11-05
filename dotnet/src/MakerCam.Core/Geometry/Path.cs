@@ -35,3 +35,16 @@ public sealed class SubPathData
 
     public bool Closed { get; set; }
 }
+
+/// <summary>Result of <see cref="Geom.JoinOpenPaths"/>.</summary>
+public sealed class JoinOpenPathsResult
+{
+    /// <summary>Paths that remain after joining. Merged paths keep their own identity.</summary>
+    public List<Path> Paths { get; init; } = new();
+
+    /// <summary>Number of endpoint joins performed.</summary>
+    public int Joins { get; init; }
+
+    /// <summary>Each path absorbed into another path, mapped to its new owner.</summary>
+    public Dictionary<Path, Path> Absorbed { get; init; } = new();
+}

@@ -40,6 +40,8 @@
                 <MenuItem Header="_Rotate…" Tag="edit-rotate" Click="Command_Click" />
                 <MenuItem Header="S_kew…" Tag="edit-skew" Click="Command_Click" />
                 <Separator />
+                <MenuItem Header="_Repair open paths…" Tag="edit-repair-open" Click="Command_Click" />
+                <Separator />
                 <MenuItem Header="_Preferences…" Tag="edit-preferences" Click="Command_Click" />
             </MenuItem>
 

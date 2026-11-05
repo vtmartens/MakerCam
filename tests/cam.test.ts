@@ -227,4 +227,33 @@ describe('toolpaths', () => {
     expect(result.loops).toHaveLength(0);
     expect(result.warnings.length).toBeGreaterThan(0);
   });
+
+  it('names the skipped open path and reports its gap', () => {
+    const open = {
+      id: 'gap-path',
+      name: 'Outer plate',
+      closed: false,
+      segments: [{ kind: 'line' as const, p1: { x: 0, y: 0 }, p2: { x: 10, y: 0 } }],
+    };
+    const result = generateToolpath('profile', params(), [open], 0.02);
+    expect(result.warnings[0]).toContain('Outer plate');
+    expect(result.warnings[0]).toContain('10 mm');
+    expect(result.warnings.some((w) => /closed path/i.test(w))).toBe(true);
+  });
+
+  it('warns about open paths even when closed paths are usable', () => {
+    const open = {
+      id: 'gap-path',
+      closed: false,
+      segments: [{ kind: 'line' as const, p1: { x: 0, y: 0 }, p2: { x: 10, y: 0 } }],
+    };
+    const result = generateToolpath(
+      'profile',
+      params({ outside: true, toolDiameter: 6 }),
+      [square(50), open],
+      0.01,
+    );
+    expect(result.loops.length).toBeGreaterThan(0);
+    expect(result.warnings.some((w) => w.includes('gap-path'))).toBe(true);
+  });
 });

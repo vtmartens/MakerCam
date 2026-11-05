@@ -35,6 +35,8 @@ public static class Renderer
     private static readonly Color PathHover = Hex("#1d6fb8");
     private static readonly Color PathSelected = Hex("#0a84ff");
     private static readonly Color PathReferenced = Hex("#8a97a6");
+    /// <summary>Free ends of open paths; also used for the dashed gap link.</summary>
+    private static readonly Color PathOpen = Hex("#e03131");
     private static readonly Color ProfileColor = Hex("#12824c");
     private static readonly Color PocketColor = Hex("#c77c08");
     private static readonly Color FollowColor = Hex("#7c3aed");
@@ -134,6 +136,9 @@ public static class Renderer
                     dc.DrawEllipse(brush, null, S(o.View, seg.P1), 2.6, 2.6);
                 }
             }
+
+            // Flag free ends so unclosed paths (which CAM skips) can be found.
+            if (!Geom.IsClosedPath(path)) DrawOpenEnds(dc, path, o.View);
         }
 
         if (o.ShowToolpaths)
@@ -355,6 +360,41 @@ public static class Renderer
             case CubicSegment cubic:
                 ctx.BezierTo(S(view, cubic.C1), S(view, cubic.C2), S(view, cubic.P2), true, false);
                 break;
+        }
+    }
+
+    /// <summary>
+    /// Marks the free ends of a path that is not closed.
+    ///
+    /// Open paths draw exactly like closed ones and CAM operations skip them, so
+    /// a stray gap (often a fraction of a millimetre after SVG import) was
+    /// previously impossible to locate. Squares mark the two ends; a dashed link
+    /// is added when they are within 1 mm of each other, where both markers
+    /// would overlap.
+    /// </summary>
+    private static void DrawOpenEnds(DrawingContext dc, Path path, View view)
+    {
+        if (path.Segments.Count == 0) return;
+        var start = path.Segments[0].P1;
+        var end = path.Segments[^1].P2;
+        var a = S(view, start);
+        var b = S(view, end);
+        var gapMm = Geom.Dist(start, end);
+
+        if (gapMm > 1e-9 && gapMm <= 1)
+        {
+            var dash = new Pen(Brush(PathOpen), 1.4)
+            {
+                DashStyle = new DashStyle(new[] { 3 / 1.4, 3 / 1.4 }, 0),
+            };
+            dash.Freeze();
+            dc.DrawLine(dash, a, b);
+        }
+
+        var pen = Pen(PathOpen, 1.6);
+        foreach (var p in new[] { a, b })
+        {
+            dc.DrawRectangle(Brush(Bg), pen, new Rect(p.X - 3, p.Y - 3, 6, 6));
         }
     }
 

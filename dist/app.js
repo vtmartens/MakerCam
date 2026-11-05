@@ -5464,6 +5464,28 @@
         };
     }
   }
+  function reverseSegment(s) {
+    switch (s.kind) {
+      case "line":
+        return { kind: "line", p1: cloneVec(s.p2), p2: cloneVec(s.p1) };
+      case "quad":
+        return { kind: "quad", p1: cloneVec(s.p2), c: cloneVec(s.c), p2: cloneVec(s.p1) };
+      case "cubic":
+        return {
+          kind: "cubic",
+          p1: cloneVec(s.p2),
+          c1: cloneVec(s.c2),
+          c2: cloneVec(s.c1),
+          p2: cloneVec(s.p1)
+        };
+    }
+  }
+  function reversePath(path) {
+    return {
+      ...path,
+      segments: path.segments.slice().reverse().map(reverseSegment)
+    };
+  }
   function clonePath(path) {
     return {
       segments: path.segments.map(cloneSegment),
@@ -5583,6 +5605,67 @@
     if (path.closed) return true;
     if (path.segments.length === 0) return false;
     return equals(path.segments[0].p1, path.segments[path.segments.length - 1].p2, tol);
+  }
+  function closePathGap(path, tolerance) {
+    if (path.segments.length === 0 || isClosedPath(path)) return false;
+    const start = path.segments[0].p1;
+    const end = path.segments[path.segments.length - 1].p2;
+    if (dist(start, end) > tolerance) return false;
+    if (!equals(start, end, 1e-9)) {
+      path.segments.push({ kind: "line", p1: cloneVec(end), p2: cloneVec(start) });
+    }
+    path.closed = true;
+    return true;
+  }
+  function joinOpenPaths(input, tolerance) {
+    const paths = input.slice();
+    const absorbed = /* @__PURE__ */ new Map();
+    let joins = 0;
+    for (; ; ) {
+      let best = null;
+      for (let i = 0; i < paths.length; i++) {
+        const a2 = paths[i];
+        if (a2.segments.length === 0 || isClosedPath(a2)) continue;
+        const aStartPoint = a2.segments[0].p1;
+        const aEndPoint = a2.segments[a2.segments.length - 1].p2;
+        for (let j = i + 1; j < paths.length; j++) {
+          const b2 = paths[j];
+          if (b2.segments.length === 0 || isClosedPath(b2)) continue;
+          const bStartPoint = b2.segments[0].p1;
+          const bEndPoint = b2.segments[b2.segments.length - 1].p2;
+          const candidates = [
+            { aStart: false, bStart: true, distance: dist(aEndPoint, bStartPoint) },
+            { aStart: false, bStart: false, distance: dist(aEndPoint, bEndPoint) },
+            { aStart: true, bStart: true, distance: dist(aStartPoint, bStartPoint) },
+            { aStart: true, bStart: false, distance: dist(aStartPoint, bEndPoint) }
+          ];
+          for (const candidate of candidates) {
+            if (candidate.distance > tolerance) continue;
+            if (!best || candidate.distance < best.distance) best = { i, j, ...candidate };
+          }
+        }
+      }
+      if (!best) break;
+      const absorbedPath = paths[best.j];
+      let a = paths[best.i];
+      let b = absorbedPath;
+      if (best.aStart) a = reversePath(a);
+      if (!best.bStart) b = reversePath(b);
+      const jointA = a.segments[a.segments.length - 1].p2;
+      const jointB = b.segments[0].p1;
+      const segments = a.segments.map(cloneSegment);
+      if (!equals(jointA, jointB, 1e-9)) {
+        segments.push({ kind: "line", p1: cloneVec(jointA), p2: cloneVec(jointB) });
+      }
+      segments.push(...b.segments.map(cloneSegment));
+      const survivor = paths[best.i];
+      survivor.segments = segments;
+      survivor.closed = false;
+      paths.splice(best.j, 1);
+      absorbed.set(absorbedPath, survivor);
+      joins++;
+    }
+    return { paths, joins, absorbed };
   }
   function polygonArea(points) {
     let a = 0;
@@ -6293,15 +6376,35 @@
       return { ...loop, tabs };
     });
   }
+  function openPathWarnings(paths, limit = 3) {
+    const open = paths.filter((p) => p.segments.length > 0 && !isClosedPath(p));
+    if (open.length === 0) return [];
+    const messages = open.slice(0, limit).map((path) => {
+      const gap = dist(path.segments[0].p1, path.segments[path.segments.length - 1].p2);
+      const name = path.name || path.id || "unnamed path";
+      const gapText = gap < 1e-3 ? "gap < 0.001 mm" : `gap ${Math.round(gap * 1e3) / 1e3} mm`;
+      return `Open path "${name}" (${gapText}) was skipped.`;
+    });
+    if (open.length > limit) {
+      messages.push(`And ${open.length - limit} more open path(s).`);
+    }
+    return messages;
+  }
   function generateToolpath(type, params, paths, tolerance) {
     const warnings = [];
     const radius = params.toolDiameter / 2;
     const selected = paths;
+    const openWarnings = openPathWarnings(selected);
     if (type === "profile") {
       const input = pathsToLoops(selected, tolerance);
       if (input.length === 0) {
-        return { loops: [], drillPoints: [], warnings: ["Select at least one closed path."] };
+        return {
+          loops: [],
+          drillPoints: [],
+          warnings: [...openWarnings, "Select at least one closed path."]
+        };
       }
+      warnings.push(...openWarnings);
       let result = offsetRegion(input, params.outside ? radius : -radius);
       if (result.length === 0) {
         warnings.push(
@@ -6317,8 +6420,13 @@
     if (type === "pocket") {
       const input = pathsToLoops(selected, tolerance);
       if (input.length === 0) {
-        return { loops: [], drillPoints: [], warnings: ["Select at least one closed path."] };
+        return {
+          loops: [],
+          drillPoints: [],
+          warnings: [...openWarnings, "Select at least one closed path."]
+        };
       }
+      warnings.push(...openWarnings);
       const stepoverDist = Math.max(0.01, params.stepover * params.toolDiameter);
       let current = offsetRegion(input, -(radius + params.roughingClearance));
       if (current.length === 0) {
@@ -6361,8 +6469,13 @@
     }
     const loops = pathsToLoops(selected, tolerance);
     if (loops.length === 0) {
-      return { loops: [], drillPoints: [], warnings: ["Select at least one closed path."] };
+      return {
+        loops: [],
+        drillPoints: [],
+        warnings: [...openWarnings, "Select at least one closed path."]
+      };
     }
+    warnings.push(...openWarnings);
     const points = [];
     if (params.center || params.spacing === 0) {
       for (const loop of loops) {
@@ -7394,6 +7507,8 @@
     pathHover: "#1d6fb8",
     pathSelected: "#0a84ff",
     pathReferenced: "#8a97a6",
+    /** Free ends of open paths; also used for the dashed gap link. */
+    pathOpen: "#e03131",
     profile: "#12824c",
     pocket: "#c77c08",
     follow: "#7c3aed",
@@ -7455,6 +7570,36 @@
       }
     }
     if (path.closed) ctx.closePath();
+  }
+  function drawOpenEnds(ctx, path, view) {
+    const count = path.segments.length;
+    if (count === 0) return;
+    const start = path.segments[0].p1;
+    const end = path.segments[count - 1].p2;
+    const a = mapPoint(view, start);
+    const b = mapPoint(view, end);
+    const gapMm = dist(start, end);
+    ctx.save();
+    if (gapMm > 1e-9 && gapMm <= 1) {
+      ctx.setLineDash([3, 3]);
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = COLORS.pathOpen;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = COLORS.pathOpen;
+    ctx.fillStyle = COLORS.bg;
+    for (const p of [a, b]) {
+      ctx.beginPath();
+      ctx.rect(p.x - 3, p.y - 3, 6, 6);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
   }
   function drawGrid(ctx, view, width, height, unit) {
     const baseMm = unit === "in" ? 25.4 : 1;
@@ -7665,6 +7810,7 @@
           ctx.fill();
         }
       }
+      if (!isClosedPath(path)) drawOpenEnds(ctx, path, opts.view);
     }
     if (opts.showToolpaths) {
       for (const op of opts.operations) {
@@ -9126,8 +9272,14 @@
       this.updateEmptyState();
       if (!op.processed) {
         showToast(warnings[0] || "No toolpath could be generated. Try different parameters.", "error", 6e3);
+      } else if (warnings.length > 0) {
+        showToast(
+          `${TYPE_LABEL[type]} created with warnings: ${warnings.slice(0, 2).join(" ")}`,
+          "warning",
+          6e3
+        );
       } else {
-        showToast(`${TYPE_LABEL[type]} created${warnings.length ? " with warnings" : ""}`, warnings.length ? "warning" : "success", 3200);
+        showToast(`${TYPE_LABEL[type]} created`, "success", 3200);
       }
       this.requestRender();
     }
@@ -9777,6 +9929,92 @@
         this.applyTransformToSelection(m, "Selection skewed");
       });
     }
+    repairOpenPathsDialog() {
+      const selection = this.selectedPaths();
+      const scope = selection.length > 0 ? selection : this.paths;
+      const open = scope.filter((p) => p.segments.length > 0 && !isClosedPath(p));
+      if (open.length === 0) {
+        showToast(
+          selection.length > 0 ? "The selected paths are already closed." : "There are no open paths to repair.",
+          "info",
+          2400
+        );
+        return;
+      }
+      const u = this.unitLabel();
+      void openDialog({
+        title: "Repair open paths",
+        description: `${open.length} open path${open.length === 1 ? "" : "s"} ${selection.length > 0 ? "in the selection" : "in the drawing"}. Close adds a line across each path\u2019s own gap; join merges free ends of different paths that meet.`,
+        fields: [
+          {
+            key: "tolerance",
+            label: "Max gap",
+            type: "number",
+            value: Number(this.toDisplay(0.2).toFixed(4)),
+            min: 0,
+            step: 0.05,
+            suffix: u
+          },
+          { key: "close", label: "Close each path\u2019s own gap", type: "checkbox", value: true },
+          { key: "join", label: "Join ends between paths", type: "checkbox", value: true }
+        ],
+        submitLabel: "Repair",
+        validate: (v) => {
+          const t = Number(v.tolerance);
+          if (!Number.isFinite(t) || t < 0) return "Max gap must be zero or more.";
+          if (!v.close && !v.join) return "Choose at least one repair action.";
+          return null;
+        }
+      }).then((v) => {
+        if (!v) return;
+        this.repairOpenPaths(open, this.fromDisplay(Number(v.tolerance)), !!v.close, !!v.join);
+      });
+    }
+    repairOpenPaths(targets, tolerance, closeGaps, joinEnds) {
+      this.pushUndo();
+      let closedCount = 0;
+      let joinCount = 0;
+      if (closeGaps) {
+        for (const path of targets) {
+          if (closePathGap(path, tolerance)) closedCount++;
+        }
+      }
+      if (joinEnds) {
+        const result = joinOpenPaths(targets, tolerance);
+        joinCount = result.joins;
+        if (result.absorbed.size > 0) {
+          const absorbed = new Set(result.absorbed.keys());
+          for (const [absorbedPath, owner] of result.absorbed) {
+            if (absorbedPath.id && this.selection.has(absorbedPath.id)) {
+              this.selection.delete(absorbedPath.id);
+              if (owner.id) this.selection.add(owner.id);
+            }
+            if (!absorbedPath.id || !owner.id || absorbedPath.id === owner.id) continue;
+            if (this.nestBoundaryId === absorbedPath.id) this.nestBoundaryId = owner.id;
+            for (const op of this.operations) {
+              if (!op.pathIds.includes(absorbedPath.id)) continue;
+              op.pathIds = [
+                ...new Set(op.pathIds.map((id) => id === absorbedPath.id ? owner.id : id))
+              ];
+            }
+          }
+          this.paths = this.paths.filter((p) => !absorbed.has(p));
+          const survivingIds = new Set(this.paths.map((p) => p.id));
+          this.selection = new Set([...this.selection].filter((id) => survivingIds.has(id)));
+        }
+      }
+      this.regenerateAll(true);
+      this.updateSelectionUI();
+      this.requestRender();
+      if (closedCount === 0 && joinCount === 0) {
+        showToast("No open ends were within the maximum gap.", "warning", 4e3);
+        return;
+      }
+      const parts = [];
+      if (closedCount > 0) parts.push(`${closedCount} gap${closedCount === 1 ? "" : "s"} closed`);
+      if (joinCount > 0) parts.push(`${joinCount} join${joinCount === 1 ? "" : "s"} made`);
+      showToast(`Repaired open paths: ${parts.join(", ")}.`, "success", 3200);
+    }
     /* ------------------------------------------------------------------ */
     /* File operations                                                     */
     /* ------------------------------------------------------------------ */
@@ -10328,6 +10566,9 @@
           break;
         case "edit-skew":
           this.skewDialog();
+          break;
+        case "edit-repair-open":
+          this.repairOpenPathsDialog();
           break;
         case "edit-preferences":
           this.preferencesDialog();

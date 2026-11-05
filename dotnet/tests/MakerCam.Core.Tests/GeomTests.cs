@@ -125,4 +125,92 @@ public class GeomTests
         Assert.Equal(10, b.MaxY, 6);
         Assert.Equal(0, b.MinY, 6);
     }
+
+    private static Path LinePath(string id, double x1, double y1, double x2, double y2) => new()
+    {
+        Id = id,
+        Closed = false,
+        Segments = { new LineSegment(new Vec(x1, y1), new Vec(x2, y2)) },
+    };
+
+    private static Path NearClosedPath() => new()
+    {
+        Id = "gap",
+        Closed = false,
+        Segments =
+        {
+            new LineSegment(new Vec(0, 0), new Vec(10, 0)),
+            new LineSegment(new Vec(10, 0), new Vec(10, 10)),
+            new LineSegment(new Vec(10, 10), new Vec(0, 0.05)),
+        },
+    };
+
+    [Fact]
+    public void ClosesAPathGapWithinTolerance()
+    {
+        var path = NearClosedPath();
+        Assert.True(Geom.ClosePathGap(path, 0.1));
+        Assert.True(path.Closed);
+        Assert.Equal(4, path.Segments.Count);
+        Assert.Equal(new Vec(0, 0), path.Segments[^1].P2);
+    }
+
+    [Fact]
+    public void LeavesALargerGapUntouched()
+    {
+        var path = NearClosedPath();
+        Assert.False(Geom.ClosePathGap(path, 0.01));
+        Assert.False(path.Closed);
+        Assert.Equal(3, path.Segments.Count);
+    }
+
+    [Fact]
+    public void JoinsTwoPathsWhoseEndsMeet()
+    {
+        var a = LinePath("a", 0, 0, 10, 0);
+        var b = LinePath("b", 10, 0, 20, 0);
+        var result = Geom.JoinOpenPaths(new[] { a, b }, 0.001);
+
+        Assert.Equal(1, result.Joins);
+        Assert.Same(a, Assert.Single(result.Paths));
+        Assert.Same(a, result.Absorbed[b]);
+        Assert.Equal(2, a.Segments.Count);
+        Assert.Equal(new[] { 0.0, 10.0, 20.0 }, Geom.FlattenPath(a).Select(p => p.X));
+    }
+
+    [Fact]
+    public void ReversesPathsWhenOppositeEndsMeet()
+    {
+        var a = LinePath("a", 0, 0, 10, 0);
+        var b = LinePath("b", 20, 0, 10, 0);
+        var result = Geom.JoinOpenPaths(new[] { a, b }, 0.001);
+
+        Assert.Equal(1, result.Joins);
+        Assert.Equal(new[] { 0.0, 10.0, 20.0 }, Geom.FlattenPath(a).Select(p => p.X));
+    }
+
+    [Fact]
+    public void BridgesASmallGapBetweenEnds()
+    {
+        var a = LinePath("a", 0, 0, 10, 0);
+        var b = LinePath("b", 10.2, 0, 20, 0);
+        var result = Geom.JoinOpenPaths(new[] { a, b }, 0.5);
+
+        Assert.Equal(1, result.Joins);
+        Assert.Equal(3, a.Segments.Count);
+        var bridge = Assert.IsType<LineSegment>(a.Segments[1]);
+        Assert.Equal(new Vec(10, 0), bridge.P1);
+        Assert.Equal(new Vec(10.2, 0), bridge.P2);
+    }
+
+    [Fact]
+    public void DoesNotJoinEndsBeyondTolerance()
+    {
+        var a = LinePath("a", 0, 0, 10, 0);
+        var b = LinePath("b", 11, 0, 20, 0);
+        var result = Geom.JoinOpenPaths(new[] { a, b }, 0.5);
+
+        Assert.Equal(0, result.Joins);
+        Assert.Equal(2, result.Paths.Count);
+    }
 }

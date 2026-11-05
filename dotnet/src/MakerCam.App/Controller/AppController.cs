@@ -1336,12 +1336,16 @@ public sealed class AppController
                 "error",
                 6000);
         }
-        else
+        else if (warnings.Count > 0)
         {
             _window.ShowToast(
-                $"{TypeLabel[type]} created{(warnings.Count > 0 ? " with warnings" : string.Empty)}",
-                warnings.Count > 0 ? "warning" : "success",
-                3200);
+                $"{TypeLabel[type]} created with warnings: {string.Join(" ", warnings.Take(2))}",
+                "warning",
+                6000);
+        }
+        else
+        {
+            _window.ShowToast($"{TypeLabel[type]} created", "success", 3200);
         }
         RequestRender();
     }
@@ -2244,6 +2248,138 @@ public sealed class AppController
         ApplyTransformToSelection(m, "Selection skewed");
     }
 
+    private void RepairOpenPathsDialog()
+    {
+        var selection = SelectedPaths();
+        var scope = selection.Count > 0 ? selection : Paths;
+        var open = scope.Where(p => p.Segments.Count > 0 && !Geom.IsClosedPath(p)).ToList();
+        if (open.Count == 0)
+        {
+            _window.ShowToast(
+                selection.Count > 0
+                    ? "The selected paths are already closed."
+                    : "There are no open paths to repair.",
+                "info",
+                2400);
+            return;
+        }
+
+        var values = ShowDialog(new DialogOptions
+        {
+            Title = "Repair open paths",
+            Description =
+                $"{open.Count} open path{(open.Count == 1 ? string.Empty : "s")} " +
+                $"{(selection.Count > 0 ? "in the selection" : "in the drawing")}. " +
+                "Close adds a line across each path's own gap; join merges free ends of different paths that meet.",
+            Fields = new[]
+            {
+                new DialogField
+                {
+                    Key = "tolerance",
+                    Label = "Max gap",
+                    Type = FieldType.Number,
+                    Value = Math.Round(ToDisplay(0.2), 4),
+                    Min = 0,
+                    Step = 0.05,
+                    Suffix = UnitLabel(),
+                },
+                new DialogField
+                {
+                    Key = "close",
+                    Label = "Close each path's own gap",
+                    Type = FieldType.Checkbox,
+                    Value = true,
+                },
+                new DialogField
+                {
+                    Key = "join",
+                    Label = "Join ends between paths",
+                    Type = FieldType.Checkbox,
+                    Value = true,
+                },
+            },
+            SubmitLabel = "Repair",
+            Validate = v =>
+            {
+                var tolerance = Number(v, "tolerance");
+                if (!double.IsFinite(tolerance) || tolerance < 0) return "Max gap must be zero or more.";
+                if (!Bool(v, "close") && !Bool(v, "join")) return "Choose at least one repair action.";
+                return null;
+            },
+        });
+        if (values is null) return;
+
+        RepairOpenPaths(
+            open,
+            FromDisplay(Number(values, "tolerance")),
+            Bool(values, "close"),
+            Bool(values, "join"));
+    }
+
+    private void RepairOpenPaths(List<Path> targets, double tolerance, bool closeGaps, bool joinEnds)
+    {
+        PushUndo();
+        var closedCount = 0;
+        var joinCount = 0;
+
+        if (closeGaps)
+        {
+            foreach (var path in targets)
+            {
+                if (Geom.ClosePathGap(path, tolerance)) closedCount++;
+            }
+        }
+
+        if (joinEnds)
+        {
+            var result = Geom.JoinOpenPaths(targets, tolerance);
+            joinCount = result.Joins;
+            if (result.Absorbed.Count > 0)
+            {
+                foreach (var (absorbedPath, owner) in result.Absorbed)
+                {
+                    if (absorbedPath.Id is not null && Selection.Contains(absorbedPath.Id))
+                    {
+                        Selection.Remove(absorbedPath.Id);
+                        if (owner.Id is not null) Selection.Add(owner.Id);
+                    }
+                    if (absorbedPath.Id is null || owner.Id is null || absorbedPath.Id == owner.Id) continue;
+                    if (_nestBoundaryId == absorbedPath.Id) _nestBoundaryId = owner.Id;
+
+                    // Operations that referenced the absorbed path now use its owner.
+                    foreach (var op in Operations)
+                    {
+                        if (!op.PathIds.Contains(absorbedPath.Id)) continue;
+                        op.PathIds = op.PathIds
+                            .Select(id => id == absorbedPath.Id ? owner.Id : id)
+                            .Distinct()
+                            .ToList();
+                    }
+                }
+
+                var absorbed = new HashSet<Path>(result.Absorbed.Keys);
+                Paths = Paths.Where(p => !absorbed.Contains(p)).ToList();
+                var survivingIds = Paths.Where(p => p.Id is not null).Select(p => p.Id!).ToHashSet();
+                Selection.RemoveWhere(id => !survivingIds.Contains(id));
+            }
+        }
+
+        RegenerateAll(true);
+        UpdateSelectionUI();
+        RequestRender();
+
+        if (closedCount == 0 && joinCount == 0)
+        {
+            _window.ShowToast("No open ends were within the maximum gap.", "warning", 4000);
+            return;
+        }
+
+        var parts = new List<string>();
+        if (closedCount > 0) parts.Add($"{closedCount} gap{(closedCount == 1 ? string.Empty : "s")} closed");
+        if (joinCount > 0) parts.Add($"{joinCount} join{(joinCount == 1 ? string.Empty : "s")} made");
+        _window.ShowToast($"Repaired open paths: {string.Join(", ", parts)}.", "success", 3200);
+    }
+
     /* ------------------------------------------------------------------ */
     /* File operations                                                     */
     /* ------------------------------------------------------------------ */
@@ -3079,6 +3215,9 @@ public sealed class AppController
                 break;
             case "edit-skew":
                 SkewDialog();
+                break;
+            case "edit-repair-open":
+                RepairOpenPathsDialog();
                 break;
             case "edit-preferences":
                 PreferencesDialog();
