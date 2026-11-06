@@ -5,9 +5,11 @@ namespace MakerCam.Core;
 /// <summary>
 /// G-code post-processor.
 ///
-/// The output format follows PartKam's original post-processor: a G20/G21
-/// preamble, one tool change per distinct cutter, profiles cut in depth slices,
-/// pockets cut level by level, and peck drilling.
+/// The output is GRBL-compatible: a G20/G21 preamble, one manual tool-change
+/// pause per distinct cutter, profiles cut in depth slices, pockets cut level by
+/// level, and peck drilling. GRBL has no automatic tool changer, so it rejects
+/// the original <c>T.. M6</c> command; tool changes are emitted as an M0 pause
+/// with a comment instead.
 /// </summary>
 public static class GcodeGenerator
 {
@@ -67,6 +69,12 @@ public static class GcodeGenerator
 
     private static void Emit(EmitState s, string line) => s.Lines.Add(line + LineEnd);
 
+    private static string ToolComment(EmitState s, int tool, Operation op)
+    {
+        var unitLabel = s.Unit == Unit.In ? "in" : "mm";
+        return $"Tool {tool + 1}: {FmtLength(op.Params.ToolDiameter, s.Unit, s.Decimals)} {unitLabel}";
+    }
+
     private static void EnsureTool(EmitState s, Operation op, IReadOnlyList<double> tools)
     {
         var tool = -1;
@@ -80,7 +88,22 @@ public static class GcodeGenerator
         }
         if (tool != s.CurrentTool)
         {
-            Emit(s, $"T{tool} M6");
+            if (s.CurrentTool >= 0)
+            {
+                // GRBL has no automatic tool changer: stop the spindle, pause for
+                // the manual change, then resume and restart it with the new cutter.
+                if (s.CutterOn)
+                {
+                    Emit(s, "M5");
+                    s.CutterOn = false;
+                }
+                Emit(s, $"({ToolComment(s, tool, op)} - change tool, then resume)");
+                Emit(s, "M0");
+            }
+            else
+            {
+                Emit(s, $"({ToolComment(s, tool, op)})");
+            }
             s.CurrentTool = tool;
         }
         if (!s.CutterOn)

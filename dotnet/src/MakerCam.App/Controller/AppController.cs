@@ -2657,7 +2657,7 @@ public sealed class AppController
         var values = ShowDialog(new DialogOptions
         {
             Title = "Export G-code",
-            Description = "Only generated toolpaths are listed. The file uses one tool change per distinct cutter.",
+            Description = "Only generated toolpaths are listed. Output is GRBL-compatible: tool changes pause with M0 for a manual cutter change.",
             Fields = fields,
             SubmitLabel = "Save .nc",
             Wide = true,

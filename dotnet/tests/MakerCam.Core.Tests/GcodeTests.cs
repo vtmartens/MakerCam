@@ -54,6 +54,8 @@ public class GcodeTests
         Assert.Contains("M5", g);
         Assert.Contains("M30", g);
         Assert.Contains("(profile 1)", g);
+        Assert.Contains("(Tool 1:", g);
+        Assert.DoesNotContain("M6", g);
     }
 
     [Fact]
@@ -153,7 +155,7 @@ public class GcodeTests
     }
 
     [Fact]
-    public void AssignsToolNumbersByDescendingDiameter()
+    public void EmitsGrblCompatibleManualToolChanges()
     {
         var a = Op(
             o => { o.Id = "a"; o.Name = "big"; },
@@ -163,10 +165,14 @@ public class GcodeTests
             p => { p.ToolDiameter = 3; p.StockSurface = 0; p.TargetDepth = -2; p.Stepdown = 2; });
 
         var g = GcodeGenerator.Generate(new[] { a, b }, Unit.Mm);
-        // 10 mm tool is T0, 3 mm tool is T1.
-        Assert.Contains("T0 M6", g);
-        Assert.Contains("T1 M6", g);
-        Assert.True(g.IndexOf("T0 M6", StringComparison.Ordinal) <
-                    g.IndexOf("T1 M6", StringComparison.Ordinal));
+        // GRBL rejects M6, so tools are selected by a comment and a pause instead.
+        Assert.DoesNotContain("M6", g);
+        Assert.DoesNotContain(g.Split('\n'), line => line.TrimStart().StartsWith('T'));
+        Assert.Contains("(Tool 1: 10 mm)", g);
+        Assert.Contains("(Tool 2: 3 mm - change tool, then resume)", g);
+        Assert.True(g.IndexOf("(Tool 1:", StringComparison.Ordinal) <
+                    g.IndexOf("(Tool 2:", StringComparison.Ordinal));
+        Assert.True(g.IndexOf("(Tool 2:", StringComparison.Ordinal) <
+                    g.IndexOf("M0", StringComparison.Ordinal));
     }
 }

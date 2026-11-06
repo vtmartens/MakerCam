@@ -1,9 +1,11 @@
 /**
  * G-code post-processor.
  *
- * The output format follows PartKam's original post-processor: a G20/G21
- * preamble, one tool change per distinct cutter, profiles cut in depth slices,
- * pockets cut level by level, and peck drilling.
+ * The output is GRBL-compatible: a G20/G21 preamble, one manual tool-change
+ * pause per distinct cutter, profiles cut in depth slices, pockets cut level by
+ * level, and peck drilling. GRBL has no automatic tool changer, so it rejects
+ * the original `T.. M6` command; tool changes are emitted as an M0 pause with a
+ * comment instead.
  */
 
 import { Vec, dist } from './geom';
@@ -68,10 +70,26 @@ function emit(s: EmitState, line: string): void {
   s.lines.push(line + LINE_END);
 }
 
+function toolComment(s: EmitState, tool: number, op: Operation): string {
+  const unitLabel = s.unit === 'in' ? 'in' : 'mm';
+  return `Tool ${tool + 1}: ${fmtLength(op.params.toolDiameter, s.unit, s.decimals)} ${unitLabel}`;
+}
+
 function ensureTool(s: EmitState, op: Operation, tools: number[]): void {
   const tool = tools.findIndex((t) => Math.abs(t - op.params.toolDiameter) < 1e-9);
   if (tool !== s.currentTool) {
-    emit(s, `T${tool} M6`);
+    if (s.currentTool >= 0) {
+      // GRBL has no automatic tool changer: stop the spindle, pause for the
+      // manual change, then resume and restart it with the new cutter.
+      if (s.cutterOn) {
+        emit(s, 'M5');
+        s.cutterOn = false;
+      }
+      emit(s, `(${toolComment(s, tool, op)} - change tool, then resume)`);
+      emit(s, 'M0');
+    } else {
+      emit(s, `(${toolComment(s, tool, op)})`);
+    }
     s.currentTool = tool;
   }
   if (!s.cutterOn) {

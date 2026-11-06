@@ -114,6 +114,9 @@ The port preserves the original CAM model:
 
 **Output**
 - G-code download (`.nc`) in millimetres (`G21`) or inches (`G20`).
+- GRBL-compatible G-code: only GRBL 1.1-supported commands are emitted. GRBL has
+  no automatic tool changer, so jobs with several cutter sizes stop at an `M0`
+  pause with a comment naming the next tool; resume when it is mounted.
 - Project save as a normal SVG that also carries CAM parameters; it can be
   reopened here, and files written by the original MakerCam/PartKam are read too.
 

@@ -6622,10 +6622,23 @@
   function emit(s, line) {
     s.lines.push(line + LINE_END);
   }
+  function toolComment(s, tool, op) {
+    const unitLabel = s.unit === "in" ? "in" : "mm";
+    return `Tool ${tool + 1}: ${fmtLength(op.params.toolDiameter, s.unit, s.decimals)} ${unitLabel}`;
+  }
   function ensureTool(s, op, tools) {
     const tool = tools.findIndex((t) => Math.abs(t - op.params.toolDiameter) < 1e-9);
     if (tool !== s.currentTool) {
-      emit(s, `T${tool} M6`);
+      if (s.currentTool >= 0) {
+        if (s.cutterOn) {
+          emit(s, "M5");
+          s.cutterOn = false;
+        }
+        emit(s, `(${toolComment(s, tool, op)} - change tool, then resume)`);
+        emit(s, "M0");
+      } else {
+        emit(s, `(${toolComment(s, tool, op)})`);
+      }
       s.currentTool = tool;
     }
     if (!s.cutterOn) {
@@ -10165,7 +10178,7 @@
       }
       void openDialog({
         title: "Export G-code",
-        description: "Only generated toolpaths are listed. The file uses one tool change per distinct cutter.",
+        description: "Only generated toolpaths are listed. Output is GRBL-compatible: tool changes pause with M0 for a manual cutter change.",
         fields,
         submitLabel: "Download .nc",
         wide: true,

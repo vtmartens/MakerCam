@@ -39,6 +39,8 @@ describe('G-code generation', () => {
     expect(g).toContain('M5');
     expect(g).toContain('M30');
     expect(g).toContain('(profile 1)');
+    expect(g).toContain('(Tool 1:');
+    expect(g).not.toMatch(/\bM6\b/);
   });
 
   it('converts coordinates and feeds to inches', () => {
@@ -98,13 +100,16 @@ describe('G-code generation', () => {
     expect(g).toContain('G1 Z-6');
   });
 
-  it('assigns tool numbers by descending diameter', () => {
+  it('emits GRBL-compatible manual tool changes', () => {
     const a = op({ id: 'a', name: 'big' }, { toolDiameter: 10, stockSurface: 0, targetDepth: -2, stepdown: 2 });
     const b = op({ id: 'b', name: 'small' }, { toolDiameter: 3, stockSurface: 0, targetDepth: -2, stepdown: 2 });
     const g = generateGcode([a, b], 'mm');
-    // 10 mm tool is T0, 3 mm tool is T1.
-    expect(g).toContain('T0 M6');
-    expect(g).toContain('T1 M6');
-    expect(g.indexOf('T0 M6')).toBeLessThan(g.indexOf('T1 M6'));
+    // GRBL rejects M6, so tools are selected by a comment and a pause instead.
+    expect(g).not.toMatch(/\bM6\b/);
+    expect(g).not.toMatch(/^T\d/m);
+    expect(g).toContain('(Tool 1: 10 mm)');
+    expect(g).toContain('(Tool 2: 3 mm - change tool, then resume)');
+    expect(g.indexOf('(Tool 1:')).toBeLessThan(g.indexOf('(Tool 2:'));
+    expect(g.indexOf('(Tool 2:')).toBeLessThan(g.indexOf('M0'));
   });
 });

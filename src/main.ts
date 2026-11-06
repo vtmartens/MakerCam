@@ -2263,7 +2263,8 @@ class App {
     }
     void openDialog({
       title: 'Export G-code',
-      description: 'Only generated toolpaths are listed. The file uses one tool change per distinct cutter.',
+      description:
+        'Only generated toolpaths are listed. Output is GRBL-compatible: tool changes pause with M0 for a manual cutter change.',
       fields,
       submitLabel: 'Download .nc',
       wide: true,
