@@ -117,6 +117,9 @@ The port preserves the original CAM model:
 - GRBL-compatible G-code: only GRBL 1.1-supported commands are emitted. GRBL has
   no automatic tool changer, so jobs with several cutter sizes stop at an `M0`
   pause with a comment naming the next tool; resume when it is mounted.
+- Older `.nc` files that still contain `T.. M6` can be cleaned with
+  `scripts/strip-toolchanges.ps1` (supports `-WhatIf`, `-Backup`, and
+  `-KeepComment`).
 - Project save as a normal SVG that also carries CAM parameters; it can be
   reopened here, and files written by the original MakerCam/PartKam are read too.
 
@@ -168,6 +171,7 @@ src/
   styles.css          UI styling (light/dark, responsive)
 tests/                Vitest unit tests (geometry, CAM, G-code, SVG, projects)
 scripts/build.mjs     esbuild bundle + static server
+scripts/strip-toolchanges.ps1  removes legacy T.. M6 lines from old .nc files
 dist/                 ready-to-open build (app.js, styles.css, index.html)
 tools/                analysis, screenshots, and browser smoke tests
 ```
