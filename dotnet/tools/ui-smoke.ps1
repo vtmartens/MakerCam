@@ -427,7 +427,11 @@ Send-RawKeys $savePath
 Send-RawKeys '{ENTER}'
 Start-Sleep -Milliseconds 2000
 Assert-Equal '3 operations' (Read-Text $window 'OpCount') 'open through native dialog'
+if ($window.Current.Name -notmatch 'makercam-smoke-project\.svg') {
+    throw "Opened file name missing from title (title is '$($window.Current.Name)')"
+}
 Write-Output 'PASS open through native dialog'
+Write-Output 'PASS opened file name shown in title'
 
 # ---------------------------------------------------------------------
 # Reopen the same file from File -> Recent Files
@@ -568,8 +572,9 @@ Click-Client 200 (69 + 200)
 Click-Client 300 (69 + 250)
 Press-Keys '{ENTER}'
 Start-Sleep -Milliseconds 500
-if ($window.Current.Name -notlike 'MakerCam Modern *') {
-    throw "Dirty title marker missing (title is '$($window.Current.Name)')"
+if ($window.Current.Name -notmatch 'makercam-smoke-project\.svg' -or
+    $window.Current.Name -notmatch '\*') {
+    throw "Dirty title marker or file name missing (title is '$($window.Current.Name)')"
 }
 Write-Output 'PASS dirty title marker'
 

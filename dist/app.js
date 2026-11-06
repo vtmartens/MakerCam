@@ -8276,6 +8276,8 @@
       __publicField(this, "nextPathId", 1);
       __publicField(this, "nextOperationId", 1);
       __publicField(this, "nestBoundaryId", null);
+      /** Name of the file currently shown, or null when nothing has been opened. */
+      __publicField(this, "documentName", null);
       __publicField(this, "renderQueued", false);
       __publicField(this, "initialized", false);
       const canvas = document.getElementById("canvas");
@@ -8294,6 +8296,7 @@
       this.renderOperations();
       this.updateEmptyState();
       this.updateStatus();
+      this.updateDocumentTitle();
       this.initialized = true;
       window.makercam = this;
       const exampleParam = new URLSearchParams(window.location.search).get("example");
@@ -8939,6 +8942,15 @@
       const el = document.getElementById("empty-state");
       if (!el) return;
       el.classList.toggle("hidden", this.paths.length > 0);
+    }
+    /** Keeps the browser tab and the header label in sync with the open file. */
+    updateDocumentTitle() {
+      document.title = this.documentName ? `${this.documentName} \u2014 ${APP_NAME}` : APP_NAME;
+      const el = document.getElementById("doc-name");
+      if (!el) return;
+      el.textContent = this.documentName ?? "";
+      el.title = this.documentName ?? "";
+      el.hidden = !this.documentName;
     }
     updateStatus() {
       const zoomPercent = Math.round(this.view.zoom / (96 / 25.4) * 100);
@@ -10051,10 +10063,12 @@
           p.id = this.newPathId();
           this.paths.push(p);
         }
+        this.documentName = filename;
         this.selection.clear();
         this.selectedOperationId = null;
         this.updateSelectionUI();
         this.updateEmptyState();
+        this.updateDocumentTitle();
         requestAnimationFrame(() => this.fit());
         showToast(
           `Imported ${imported.paths.length} path${imported.paths.length === 1 ? "" : "s"} from ${filename}`,
@@ -10069,6 +10083,7 @@
       }
     }
     loadProject(project, filename) {
+      this.documentName = filename;
       this.pushUndo();
       this.paths = project.paths;
       this.ensurePathIds(this.paths);
@@ -10090,6 +10105,7 @@
       this.regenerateAll(true);
       this.updateSelectionUI();
       this.updateEmptyState();
+      this.updateDocumentTitle();
       this.renderOperations();
       requestAnimationFrame(() => this.fit());
       showToast(
@@ -10115,6 +10131,8 @@
       }));
       const svg = serializeProject(this.paths, defs, this.unit);
       downloadText("makercam-project.svg", svg, "image/svg+xml");
+      this.documentName = "makercam-project.svg";
+      this.updateDocumentTitle();
       showToast("Project saved (SVG + CAM metadata)", "success", 2600);
     }
     exportGcodeDialog() {
@@ -10320,6 +10338,7 @@
         this.nextPathId = 1;
         this.nextOperationId = 1;
         this.nestBoundaryId = null;
+        this.documentName = null;
         for (const p of imported.paths) {
           p.id = this.newPathId();
           this.paths.push(p);
@@ -10412,6 +10431,7 @@
         this.regenerateAll(true);
         this.updateSelectionUI();
         this.updateEmptyState();
+        this.updateDocumentTitle();
         requestAnimationFrame(() => this.fit());
         showToast("Example loaded: drill, pocket and profile", "success", 4e3);
         if (imported.warnings.length > 0) {
@@ -10535,8 +10555,10 @@
             this.nextPathId = 1;
             this.nextOperationId = 1;
             this.nestBoundaryId = null;
+            this.documentName = null;
             this.updateSelectionUI();
             this.updateEmptyState();
+            this.updateDocumentTitle();
             this.fit();
           }
           break;

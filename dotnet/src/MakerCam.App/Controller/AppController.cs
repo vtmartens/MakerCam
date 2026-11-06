@@ -141,6 +141,9 @@ public sealed class AppController
     private List<string> _recentFiles = new();
     private const int RecentFilesLimit = 10;
 
+    /// <summary>Name of the file currently shown, or null for an unsaved project.</summary>
+    private string? _documentName;
+
     private int _revision;
     private int _savedRevision;
 
@@ -361,8 +364,12 @@ public sealed class AppController
         UpdateTitle();
     }
 
-    private void UpdateTitle() =>
-        _window.Title = IsDirty ? "MakerCam Modern *" : "MakerCam Modern";
+    private void UpdateTitle()
+    {
+        var name = string.IsNullOrEmpty(_documentName) ? "Untitled" : _documentName;
+        var dirty = IsDirty ? " *" : string.Empty;
+        _window.Title = $"{name}{dirty} — {AppName}";
+    }
 
     /// <summary>Asks to save before closing. Returns false to keep the window open.</summary>
     public bool ConfirmClose() => !IsDirty || ConfirmDiscard("closing");
@@ -2462,6 +2469,8 @@ public sealed class AppController
             {
                 if (!ConfirmDiscard("opening this project")) return;
                 LoadProject(project, filename);
+                _documentName = filename;
+                UpdateTitle();
                 AddRecentFile(fullPath ?? filename);
                 return;
             }
@@ -2502,11 +2511,13 @@ public sealed class AppController
                 _pageHeightMm = imported.HeightMm > 0 ? imported.HeightMm : null;
             }
 
+            _documentName = filename;
             Selection.Clear();
             SelectedOperationId = null;
             _flattenCache.Clear();
             UpdateSelectionUI();
             UpdateEmptyState();
+            UpdateTitle();
             Fit();
             _window.ShowToast(
                 $"Imported {imported.Paths.Count} path{(imported.Paths.Count == 1 ? string.Empty : "s")} from {filename}",
@@ -2593,6 +2604,7 @@ public sealed class AppController
             }).ToList();
             var svg = ProjectIO.SerializeProject(Paths, defs, DisplayUnit, _pageWidthMm, _pageHeightMm);
             System.IO.File.WriteAllText(dialog.FileName, svg, new UTF8Encoding(false));
+            _documentName = System.IO.Path.GetFileName(dialog.FileName);
             MarkClean();
             _window.ShowToast("Project saved (SVG + CAM metadata)", "success", 2600);
             return true;
@@ -3035,6 +3047,7 @@ public sealed class AppController
             {
                 _window.ShowToast(string.Join(" ", imported.Warnings.Take(2)), "warning", 5000);
             }
+            _documentName = null;
             MarkClean();
         }
         catch (Exception ex)
@@ -3183,6 +3196,7 @@ public sealed class AppController
                 _emptyStateDismissed = false;
                 _pageWidthMm = null;
                 _pageHeightMm = null;
+                _documentName = null;
                 MarkClean();
                 UpdateSelectionUI();
                 UpdateEmptyState();

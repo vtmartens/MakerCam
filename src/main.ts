@@ -192,6 +192,9 @@ class App {
   private nextOperationId = 1;
   private nestBoundaryId: string | null = null;
 
+  /** Name of the file currently shown, or null when nothing has been opened. */
+  private documentName: string | null = null;
+
   private renderQueued = false;
   private initialized = false;
 
@@ -214,6 +217,7 @@ class App {
     this.renderOperations();
     this.updateEmptyState();
     this.updateStatus();
+    this.updateDocumentTitle();
 
     this.initialized = true;
     // Development/automation hook. Harmless in normal use and useful for
@@ -938,6 +942,16 @@ class App {
     const el = document.getElementById('empty-state');
     if (!el) return;
     el.classList.toggle('hidden', this.paths.length > 0);
+  }
+
+  /** Keeps the browser tab and the header label in sync with the open file. */
+  private updateDocumentTitle(): void {
+    document.title = this.documentName ? `${this.documentName} — ${APP_NAME}` : APP_NAME;
+    const el = document.getElementById('doc-name');
+    if (!el) return;
+    el.textContent = this.documentName ?? '';
+    el.title = this.documentName ?? '';
+    el.hidden = !this.documentName;
   }
 
   private updateStatus(): void {
@@ -2144,10 +2158,12 @@ class App {
         p.id = this.newPathId();
         this.paths.push(p);
       }
+      this.documentName = filename;
       this.selection.clear();
       this.selectedOperationId = null;
       this.updateSelectionUI();
       this.updateEmptyState();
+      this.updateDocumentTitle();
       requestAnimationFrame(() => this.fit());
       showToast(
         `Imported ${imported.paths.length} path${imported.paths.length === 1 ? '' : 's'} from ${filename}`,
@@ -2163,6 +2179,7 @@ class App {
   }
 
   private loadProject(project: ProjectData, filename: string): void {
+    this.documentName = filename;
     this.pushUndo();
     this.paths = project.paths;
     this.ensurePathIds(this.paths);
@@ -2184,6 +2201,7 @@ class App {
     this.regenerateAll(true);
     this.updateSelectionUI();
     this.updateEmptyState();
+    this.updateDocumentTitle();
     this.renderOperations();
     requestAnimationFrame(() => this.fit());
     showToast(
@@ -2210,6 +2228,8 @@ class App {
     }));
     const svg = serializeProject(this.paths, defs, this.unit);
     downloadText('makercam-project.svg', svg, 'image/svg+xml');
+    this.documentName = 'makercam-project.svg';
+    this.updateDocumentTitle();
     showToast('Project saved (SVG + CAM metadata)', 'success', 2600);
   }
 
@@ -2428,6 +2448,7 @@ class App {
       this.nextPathId = 1;
       this.nextOperationId = 1;
       this.nestBoundaryId = null;
+      this.documentName = null;
       for (const p of imported.paths) {
         p.id = this.newPathId();
         this.paths.push(p);
@@ -2526,6 +2547,7 @@ class App {
       this.regenerateAll(true);
       this.updateSelectionUI();
       this.updateEmptyState();
+      this.updateDocumentTitle();
       requestAnimationFrame(() => this.fit());
       showToast('Example loaded: drill, pocket and profile', 'success', 4000);
       if (imported.warnings.length > 0) {
@@ -2656,8 +2678,10 @@ class App {
           this.nextPathId = 1;
           this.nextOperationId = 1;
           this.nestBoundaryId = null;
+          this.documentName = null;
           this.updateSelectionUI();
           this.updateEmptyState();
+          this.updateDocumentTitle();
           this.fit();
         }
         break;
