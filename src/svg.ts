@@ -231,6 +231,8 @@ export function parseSvg(text: string, options: ImportOptions = {}): ImportResul
   const pxPerInch = options.pxPerInch ?? 96;
   const warnings: string[] = [];
   const parser = new DOMParser();
+  // Parsing creates an inert document. Only element names, attributes, and
+  // geometry are read; the document is never inserted into the live DOM.
   const doc = parser.parseFromString(text, 'image/svg+xml');
   const parseError = doc.querySelector('parsererror');
   if (parseError) {

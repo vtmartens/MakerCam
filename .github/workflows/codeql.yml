@@ -45,6 +45,7 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.buildMode }}
           queries: security-extended
+          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Build C#
         if: matrix.language == 'csharp'
