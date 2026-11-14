@@ -50,13 +50,14 @@ const bundle = await build({
   logLevel: 'silent',
 });
 
-const bundleFile = path.join(os.tmpdir(), `makercam-oracle-${process.pid}.cjs`);
+const bundleDir = fs.mkdtempSync(path.join(os.tmpdir(), 'makercam-oracle-'));
+const bundleFile = path.join(bundleDir, 'bundle.cjs');
 fs.writeFileSync(bundleFile, bundle.outputFiles[0].text, 'utf8');
 let core;
 try {
   core = createRequire(import.meta.url)(bundleFile);
 } finally {
-  fs.unlinkSync(bundleFile);
+  fs.rmSync(bundleDir, { recursive: true, force: true });
 }
 
 /* ------------------------------------------------------------------ */

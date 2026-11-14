@@ -171,6 +171,8 @@ function pathMapBySource(paths: Path[]): Map<string, Path[]> {
 export function parseProject(text: string, options: ImportOptions = {}): ProjectData | null {
   const imported = parseSvg(text, options);
   const parser = new DOMParser();
+  // Parsing creates an inert document. Only metadata elements and attributes
+  // are read; the document is never inserted into the live DOM.
   const doc = parser.parseFromString(text, 'image/svg+xml');
   if (doc.querySelector('parsererror')) return null;
 

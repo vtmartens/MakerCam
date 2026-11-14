@@ -24,8 +24,7 @@ await build({
 const html = await readFile(join(root, 'index.html'), 'utf8');
 const builtHtml = html
   .replace('./src/styles.css', './styles.css')
-  .replace('./dist/app.js', './app.js')
-  .replace('./app.js', './app.js');
+  .replace('./dist/app.js', './app.js');
 await writeFile(join(dist, 'index.html'), builtHtml, 'utf8');
 await cp(join(root, 'src/styles.css'), join(dist, 'styles.css'));
 
