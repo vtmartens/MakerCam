@@ -79,6 +79,8 @@ to use another installation. Start the dev server first with `npm run dev`.
   and C# implementations. The oracle tests exist for this.
 - Add or update tests for behavior changes.
 - Keep user-facing wording consistent between the web and native apps.
+- Pin GitHub Actions to full commit SHAs and keep a `# vX.Y.Z` comment so
+  Dependabot can update them.
 - Do not commit secrets, credentials, personal paths, or proprietary designs.
 - Update documentation when behavior or command-line usage changes.
 
