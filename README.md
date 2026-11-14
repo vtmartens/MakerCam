@@ -33,7 +33,7 @@ Everything runs locally in the browser. Drawings are never uploaded.
 
 ### Develop
 
-Requirements: Node.js 20+ (Node 24 LTS recommended).
+Requirements: Node.js 20.19+ or 22.12+ (Node 24 LTS recommended).
 
 ```bash
 npm install
