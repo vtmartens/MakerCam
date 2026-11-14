@@ -5,6 +5,11 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    # Vitest 5 requires Node 22.12+, but MakerCam supports Node 20.19+.
+    ignore:
+      - dependency-name: "vitest"
+        versions:
+          - ">=5.0.0"
     groups:
       npm-minor-patch:
         patterns:
@@ -61,3 +66,14 @@ updates:
         update-types:
           - "minor"
           - "patch"
+
+  - package-ecosystem: "nuget"
+    directory: "/dotnet/.config"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    # WiX 6+ requires the Open Source Maintenance Fee EULA; the installer pins 5.x.
+    ignore:
+      - dependency-name: "wix"
+        versions:
+          - ">=6.0.0"
