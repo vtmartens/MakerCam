@@ -1,0 +1,53 @@
+name: Feature request
+description: Suggest an idea or improvement for MakerCam
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of MakerCam would this affect?
+      options:
+        - Web app
+        - Native Windows app
+        - Installer
+        - SVG or project import
+        - G-code generation
+        - Documentation or tooling
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to do, and what is missing or difficult today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior you would like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: I have searched existing issues for a similar request.
+          required: true
+        - label: I have checked that this is not a security vulnerability; security issues follow SECURITY.md.
+          required: true

@@ -1,0 +1,92 @@
+name: Bug report
+description: Report a reproducible problem in MakerCam
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Do not use this form for security
+        vulnerabilities; follow [SECURITY.md](https://github.com/vtmartens/MakerCam/blob/main/SECURITY.md)
+        instead.
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Where did the problem occur?
+      options:
+        - Web app
+        - Native Windows app
+        - Installer
+        - SVG or project import
+        - G-code generation
+        - Documentation or tooling
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The release tag or commit you tested.
+      placeholder: "1.0.6 or abc1234"
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system and browser
+      placeholder: "Windows 11, Edge 142; or Windows 11 native app"
+    validations:
+      required: false
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include a minimal SVG or project file where possible.
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. Add ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the error text, screenshots, or the relevant output.
+    validations:
+      required: true
+
+  - type: textarea
+    id: gcode
+    attributes:
+      label: Relevant G-code, SVG, or project data
+      description: Remove personal data and credentials before pasting.
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: I am not reporting a security vulnerability; I will follow SECURITY.md instead.
+          required: true
+        - label: I have reproduced this on the latest release or main branch.
+          required: true
+        - label: I understand that generated G-code must be verified before it is run on a machine.
+          required: true

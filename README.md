@@ -187,12 +187,21 @@ traceability. Generated screenshots and test artifacts are also in `tools/screen
 ## Verification performed
 
 - SWF header/tag/ABC analysis and FFDec decompilation of all 154 classes.
-- 43 unit tests covering geometry, SVG import/export, offsets, self-intersecting
+- 55 unit tests covering geometry, SVG import/export, offsets, self-intersecting
   and overlapping paths, toolpaths, G-code, and project round-tripping (including
   files in the original MakerCam format).
 - Headless Microsoft Edge end-to-end checks: import, select, pocket, follow,
   profile + tabs, G-code download, save/reopen project, undo/redo, pen, drag,
   marquee, zoom, toolpath selection, and nesting.
+
+---
+
+## Contributing
+
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development
+setup, testing, and pull request guidance. By participating you agree to follow
+the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues privately as
+described in [SECURITY.md](SECURITY.md).
 
 ---
 
