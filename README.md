@@ -42,6 +42,9 @@ npm test         # unit tests
 npm run build    # writes dist/app.js, dist/styles.css, dist/index.html
 ```
 
+The browser checks under `tools/` launch Microsoft Edge by default; set
+`EDGE_PATH` (or `CHROME_PATH`) to use another Chromium installation.
+
 ---
 
 ## Native Windows app

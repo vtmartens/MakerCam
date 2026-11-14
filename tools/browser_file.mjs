@@ -1,12 +1,13 @@
 import { chromium } from 'playwright-core';
+import { executablePath, fileUrl } from './browser_env.mjs';
 
-const browser = await chromium.launch({ executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', headless: true });
+const browser = await chromium.launch({ executablePath, headless: true });
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 }, acceptDownloads: true });
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push(e.message));
 
-const url = 'file:///C:/Users/v_t_m/source/repos/MakerCam/dist/index.html';
+const url = fileUrl('dist', 'index.html');
 await page.goto(url, { waitUntil: 'load' });
 await page.waitForFunction(() => window.makercam !== undefined);
 await page.waitForTimeout(400);

@@ -1,6 +1,7 @@
 import { chromium } from 'playwright-core';
+import { executablePath } from './browser_env.mjs';
 
-const browser = await chromium.launch({ executablePath: 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe', headless: true });
+const browser = await chromium.launch({ executablePath, headless: true });
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 }, acceptDownloads: true });
 const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });

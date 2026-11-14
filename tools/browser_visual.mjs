@@ -1,6 +1,6 @@
 import { chromium } from 'playwright-core';
+import { executablePath, fileUrl } from './browser_env.mjs';
 
-const executablePath = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const browser = await chromium.launch({ executablePath, headless: true });
 const errors = [];
 
@@ -67,7 +67,7 @@ await page.close();
 
 // Root index.html from disk (uses src/styles.css + dist/app.js)
 page = await makePage();
-await page.goto('file:///C:/Users/v_t_m/source/repos/MakerCam/index.html', { waitUntil: 'load' });
+await page.goto(fileUrl('index.html'), { waitUntil: 'load' });
 await page.waitForFunction(() => window.makercam !== undefined);
 const rootOk = await page.evaluate(() => !!window.makercam && document.styleSheets.length > 0);
 console.log('root index.html works:', rootOk);
